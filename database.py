@@ -5,7 +5,7 @@ import sqlite3
 from typing import Optional
 from datetime import datetime
 
-DB_PATH = "../data/intento.db"
+DB_PATH = "/tmp/intento.db"
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
