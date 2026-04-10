@@ -1,19 +1,11 @@
-"""
-INTENTO - Backend principal
-FastAPI + SQLite + Scraping + Clasificacion IA
-"""
-
 from fastapi import FastAPI, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import uvicorn
 from datetime import datetime
 from typing import Optional
-
 from database import init_db, get_leads, save_lead, get_stats
-from classifier.intent_classifier import classify_intent
-from generator.message_generator import generate_message
+from classifier import classify_intent
+from message_generator import generate_message
 
 app = FastAPI(title="Intento API", version="1.0.0")
 
@@ -24,62 +16,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup():
+    init_db()
+
 @app.get("/api/leads")
-def list_leads(
-    intencion: Optional[str] = None,
-    fuente: Optional[str] = None,
-    limit: int = Query(default=50, le=200)
-):
-    return get_leads(intencion=intencion, fuente=fuente, limit=limit)
+def list_leads(intencion=None, fuente=None):
+    return get_leads(intencion=intencion, fuente=fuente)
 
 @app.get("/api/stats")
 def stats():
     return get_stats()
 
-@app.post("/api/scan")
-def scan(background_tasks: BackgroundTasks, keywords: str = "necesito contador"):
-    background_tasks.add_task(run_scan, keywords)
-    return {"status": "scanning", "keywords": keywords}
-
-@app.post("/api/leads/{lead_id}/message")
-def get_message(lead_id: int):
-    leads = get_leads()
-    lead = next((l for l in leads if l["id"] == lead_id), None)
-    if not lead:
-        return {"error": "Lead no encontrado"}
-    msg = generate_message(lead["texto_detectado"], lead["nivel_intencion"])
-    return {"mensaje": msg}
-
 @app.post("/api/leads/manual")
 def add_manual_lead(texto: str, fuente: str = "manual", link: str = ""):
     nivel = classify_intent(texto)
-    lead = {
-        "texto_detectado": texto,
-        "nivel_intencion": nivel,
-        "fuente": fuente,
-        "link": link,
-        "fecha": datetime.now().isoformat()
-    }
+    lead = {"texto_detectado": texto, "nivel_intencion": nivel, "fuente": fuente, "link": link, "fecha": datetime.now().isoformat()}
     lead_id = save_lead(lead)
     return {"id": lead_id, **lead}
 
-def run_scan(keywords: str):
-    scraper = GoogleScraper()
-    resultados = scraper.search(keywords)
-    saved = 0
-    for r in resultados:
-        nivel = classify_intent(r["texto"])
-        if nivel != "sin_intencion":
-            lead = {
-                "texto_detectado": r["texto"],
-                "nivel_intencion": nivel,
-                "fuente": r["fuente"],
-                "link": r["link"],
-                "fecha": datetime.now().isoformat()
-            }
-            save_lead(lead)
-            saved += 1
-    print(f"[SCAN] {keywords}: {len(resultados)} resultados -> {saved} leads guardados")
+@app.get("/")
+def root():
+    return {"status": "Intento API corriendo"}
 
 if __name__ == "__main__":
     init_db()
