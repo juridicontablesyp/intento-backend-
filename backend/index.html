@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intento — Lead Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #7c6af7;
+    --accent2: #f7c16a;
+    --alta: #ff5e5e;
+    --media: #f7c16a;
+    --baja: #5ee8a0;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BG */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.9);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+
+  .badge {
+    font-size: 10px;
+    background: rgba(124,106,247,0.15);
+    border: 1px solid rgba(124,106,247,0.3);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+
+  /* SCAN BAR */
+  .scan-bar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    padding: 16px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .scan-bar input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 16px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .scan-bar input:focus { border-color: var(--accent); }
+  .scan-bar input::placeholder { color: var(--muted); }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: #9080ff; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  /* STATS */
+  .stats-row {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-card {
+    background: var(--surface);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-value.alta  { color: var(--alta); }
+  .stat-value.media { color: var(--media); }
+  .stat-value.baja  { color: var(--baja); }
+  .stat-value.total { color: var(--text); }
+  .stat-value.conv  { color: var(--accent); }
+
+  /* FILTERS */
+  .filters {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    transition: all 0.15s;
+  }
+  .filter-btn:hover, .filter-btn.active { background: var(--surface); color: var(--text); border-color: var(--muted); }
+  .filter-btn.f-alta  { border-color: rgba(255,94,94,0.3); }
+  .filter-btn.f-alta.active, .filter-btn.f-alta:hover { background: rgba(255,94,94,0.1); color: var(--alta); border-color: var(--alta); }
+  .filter-btn.f-media { border-color: rgba(247,193,106,0.3); }
+  .filter-btn.f-media.active, .filter-btn.f-media:hover { background: rgba(247,193,106,0.1); color: var(--media); border-color: var(--media); }
+  .filter-btn.f-baja  { border-color: rgba(94,232,160,0.3); }
+  .filter-btn.f-baja.active, .filter-btn.f-baja:hover { background: rgba(94,232,160,0.1); color: var(--baja); border-color: var(--baja); }
+
+  /* LEADS TABLE */
+  .leads-container {
+    position: relative;
+    z-index: 10;
+    padding: 24px 32px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+
+  .lead-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: start;
+    transition: border-color 0.15s, transform 0.1s;
+    cursor: pointer;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .lead-card:hover { border-color: var(--accent); transform: translateX(2px); }
+
+  .intent-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .intent-dot.alta  { background: var(--alta);  box-shadow: 0 0 8px var(--alta); }
+  .intent-dot.media { background: var(--media); box-shadow: 0 0 8px var(--media); }
+  .intent-dot.baja  { background: var(--baja);  box-shadow: 0 0 8px var(--baja); }
+
+  .lead-body { min-width: 0; }
+
+  .lead-text {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .lead-source {
+    background: rgba(124,106,247,0.1);
+    border: 1px solid rgba(124,106,247,0.2);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+
+  .lead-actions { display: flex; gap: 6px; }
+
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-sm:hover { background: var(--bg); color: var(--text); }
+  .btn-sm.msg { border-color: rgba(124,106,247,0.3); color: var(--accent); }
+  .btn-sm.msg:hover { background: rgba(124,106,247,0.1); }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 500px;
+    width: 90%;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:none; } }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--accent);
+  }
+
+  .modal-msg {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+  }
+
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-family: var(--font-display); font-size: 16px; }
+  .empty-sub  { font-size: 12px; margin-top: 6px; }
+
+  /* SCAN PULSE */
+  .scanning-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+  .scanning-indicator.active { display: flex; }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.3)} }
+
+  /* MANUAL ADD */
+  .add-section {
+    position: relative;
+    z-index: 10;
+    padding: 0 32px 24px;
+  }
+  .add-form {
+    display: none;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .add-form.open { display: flex; }
+  .add-form textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    resize: none;
+    height: 60px;
+    outline: none;
+  }
+  .add-form textarea:focus { border-color: var(--accent); }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 12px;
+    color: var(--accent);
+    z-index: 200;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.2s;
+  }
+  .toast.show { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo">int<span>ento</span></span>
+    <span class="badge">MVP v1.0</span>
+  </div>
+  <div class="header-actions">
+    <div class="scanning-indicator" id="scanningIndicator">
+      <div class="pulse"></div> Escaneando...
+    </div>
+    <button class="btn btn-ghost" onclick="loadLeads()">↻ Actualizar</button>
+  </div>
+</header>
+
+<!-- SCAN BAR -->
+<div class="scan-bar">
+  <input type="text" id="scanInput" placeholder="ej: necesito contador urgente, problema AFIP, busco abogado..." value="necesito contador">
+  <button class="btn btn-primary" id="scanBtn" onclick="startScan()">⚡ Escanear</button>
+  <button class="btn btn-ghost" onclick="toggleAddForm()">+ Manual</button>
+</div>
+
+<!-- MANUAL ADD -->
+<div class="add-section">
+  <div class="add-form" id="addForm">
+    <textarea id="manualText" placeholder="Pegá acá el texto del post o comentario a clasificar..."></textarea>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn btn-primary" onclick="addManual()">Clasificar</button>
+      <button class="btn btn-ghost" onclick="toggleAddForm()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-row" id="statsRow">
+  <div class="stat-card"><div class="stat-label">Total Leads</div><div class="stat-value total" id="statTotal">—</div></div>
+  <div class="stat-card"><div class="stat-label">Alta Intención</div><div class="stat-value alta" id="statAlta">—</div></div>
+  <div class="stat-card"><div class="stat-label">Media Intención</div><div class="stat-value media" id="statMedia">—</div></div>
+  <div class="stat-card"><div class="stat-label">Baja Intención</div><div class="stat-value baja" id="statBaja">—</div></div>
+  <div class="stat-card"><div class="stat-label">Conversión %</div><div class="stat-value conv" id="statConv">—</div></div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <button class="filter-btn active" onclick="setFilter(null, this)">Todos</button>
+  <button class="filter-btn f-alta"  onclick="setFilter('alta', this)">🔴 Alta</button>
+  <button class="filter-btn f-media" onclick="setFilter('media', this)">🟡 Media</button>
+  <button class="filter-btn f-baja"  onclick="setFilter('baja', this)">🟢 Baja</button>
+</div>
+
+<!-- LEADS -->
+<div class="leads-container">
+  <div class="section-title">Leads Detectados</div>
+  <div id="leadsContainer">
+    <div class="empty">
+      <div class="empty-icon">🎯</div>
+      <div class="empty-text">Sin leads todavía</div>
+      <div class="empty-sub">Ingresá keywords y presioná Escanear</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MENSAJE -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title">💬 Mensaje de Contacto</div>
+    <div class="modal-msg" id="modalMsg">Generando...</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="copyMsg()">📋 Copiar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://intento-backend.onrender.com/api';
+let currentFilter = null;
+
+// ── DATOS DEMO (para funcionar sin backend) ──
+const DEMO_LEADS = [
+  {id:1, texto_detectado:"necesito un contador urgente, me llegó una intimación de AFIP y no sé qué hacer", nivel_intencion:"alta", fuente:"reddit", link:"https://reddit.com/r/argentina", fecha:"2024-01-15T10:30:00"},
+  {id:2, texto_detectado:"alguien me recomiende un buen contador en Buenos Aires? tengo problema con el monotributo", nivel_intencion:"alta", fuente:"reddit", link:"https://reddit.com/r/argentina", fecha:"2024-01-15T09:15:00"},
+  {id:3, texto_detectado:"cómo funciona el cambio de categoría en AFIP? tengo dudas sobre mis facturas", nivel_intencion:"media", fuente:"google", link:"https://example.com", fecha:"2024-01-15T08:00:00"},
+  {id:4, texto_detectado:"me cayó una multa de AFIP no entiendo nada necesito ayuda ya", nivel_intencion:"alta", fuente:"manual", link:"", fecha:"2024-01-14T20:00:00"},
+  {id:5, texto_detectado:"busco abogado para caso de herencia en provincia de buenos aires", nivel_intencion:"alta", fuente:"reddit", link:"https://reddit.com/r/legaladvice_ar", fecha:"2024-01-14T18:30:00"},
+  {id:6, texto_detectado:"ganancias cuarta categoría empleados en relación de dependencia", nivel_intencion:"baja", fuente:"google", link:"https://example.com", fecha:"2024-01-14T14:00:00"},
+  {id:7, texto_detectado:"monotributo categorías 2024 cuánto se paga por mes", nivel_intencion:"baja", fuente:"google", link:"https://example.com", fecha:"2024-01-14T11:00:00"},
+];
+
+const DEMO_STATS = { total:7, alta_intencion:4, media_intencion:1, baja_intencion:2, contactados:1, tasa_conversion:14.3 };
+
+async function apiCall(url, opts={}) {
+  try {
+    const r = await fetch(API + url, opts);
+    return await r.json();
+  } catch {
+    return null; // backend no disponible, usar demo
+  }
+}
+
+async function loadStats() {
+  const data = await apiCall('/stats') || DEMO_STATS;
+  document.getElementById('statTotal').textContent = data.total;
+  document.getElementById('statAlta').textContent = data.alta_intencion;
+  document.getElementById('statMedia').textContent = data.media_intencion;
+  document.getElementById('statBaja').textContent = data.baja_intencion;
+  document.getElementById('statConv').textContent = data.tasa_conversion + '%';
+}
+
+async function loadLeads() {
+  let url = '/leads?limit=100';
+  if (currentFilter) url += `&intencion=${currentFilter}`;
+  const leads = await apiCall(url) || DEMO_LEADS.filter(l => !currentFilter || l.nivel_intencion === currentFilter);
+
+  const container = document.getElementById('leadsContainer');
+  if (!leads.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin leads para este filtro</div></div>`;
+    return;
+  }
+
+  container.innerHTML = leads.map(l => `
+    <div class="lead-card" data-id="${l.id}">
+      <div class="intent-dot ${l.nivel_intencion}"></div>
+      <div class="lead-body">
+        <div class="lead-text" title="${escHtml(l.texto_detectado)}">${escHtml(l.texto_detectado)}</div>
+        <div class="lead-meta">
+          <span class="lead-source">${l.fuente || 'manual'}</span>
+          <span>${formatDate(l.fecha)}</span>
+          <span style="color:${intColor(l.nivel_intencion)}">${l.nivel_intencion} intención</span>
+        </div>
+      </div>
+      <div class="lead-actions">
+        ${l.link ? `<button class="btn-sm" onclick="window.open('${escHtml(l.link)}','_blank')">🔗 Ver</button>` : ''}
+        <button class="btn-sm msg" onclick="genMessage(${l.id})">💬 Msg</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function startScan() {
+  const kw = document.getElementById('scanInput').value.trim();
+  if (!kw) return;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Escaneando...';
+  document.getElementById('scanningIndicator').classList.add('active');
+
+  const res = await apiCall(`/scan?keywords=${encodeURIComponent(kw)}`, {method:'POST'});
+  showToast(res ? 'Escaneo iniciado en background' : 'Modo demo: leads de ejemplo cargados');
+
+  setTimeout(() => {
+    btn.disabled = false; btn.textContent = '⚡ Escanear';
+    document.getElementById('scanningIndicator').classList.remove('active');
+    loadLeads(); loadStats();
+  }, 2000);
+}
+
+async function genMessage(leadId) {
+  document.getElementById('modalMsg').textContent = 'Generando mensaje...';
+  document.getElementById('modalOverlay').classList.add('open');
+
+  const res = await apiCall(`/leads/${leadId}/message`, {method:'POST'});
+  const lead = DEMO_LEADS.find(l => l.id === leadId);
+
+  let msg;
+  if (res && res.mensaje) {
+    msg = res.mensaje;
+  } else {
+    // Demo local
+    const msgs = {
+      alta:  "Hola! Vi que estás buscando un contador. Te puedo ayudar, tengo experiencia en exactamente ese tema. Sin compromiso, si querés charlamos.",
+      media: "Hola! Vi que mencionaste AFIP. Si en algún momento necesitás asesoramiento, estoy disponible para una consulta sin cargo.",
+      baja:  "Hola! Si en algún momento necesitás ayuda con impuestos, no dudes en consultarme. Trabajo como contador."
+    };
+    msg = msgs[lead?.nivel_intencion || 'baja'];
+  }
+  document.getElementById('modalMsg').textContent = msg;
+}
+
+async function addManual() {
+  const texto = document.getElementById('manualText').value.trim();
+  if (!texto) return;
+  const res = await apiCall(`/leads/manual?texto=${encodeURIComponent(texto)}&fuente=manual`, {method:'POST'});
+  if (res) {
+    showToast(`Lead clasificado: ${res.nivel_intencion} intención`);
+  } else {
+    showToast('Demo: lead agregado localmente');
+    DEMO_LEADS.unshift({id: Date.now(), texto_detectado: texto, nivel_intencion:'media', fuente:'manual', link:'', fecha:new Date().toISOString()});
+  }
+  document.getElementById('manualText').value = '';
+  toggleAddForm();
+  loadLeads(); loadStats();
+}
+
+function setFilter(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadLeads();
+}
+
+function toggleAddForm() {
+  document.getElementById('addForm').classList.toggle('open');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+}
+
+function copyMsg() {
+  const txt = document.getElementById('modalMsg').textContent;
+  navigator.clipboard.writeText(txt);
+  showToast('Mensaje copiado!');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+
+function intColor(n) {
+  return n==='alta' ? 'var(--alta)' : n==='media' ? 'var(--media)' : 'var(--baja)';
+}
+
+// INIT
+loadStats();
+loadLeads();
+</script>
+</body>
+</html>
