@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Optional
 
 from database import init_db, get_leads, save_lead, get_stats
-from scrapers.google_scraper import GoogleScraper
 from classifier.intent_classifier import classify_intent
 from generator.message_generator import generate_message
 
