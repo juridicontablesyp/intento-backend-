@@ -1,6 +1,6 @@
 """
 scraper.py - Scraping LEGAL de múltiples fuentes públicas argentinas
-Fuentes: Reddit API + Foros + Grupos públicos + Búsquedas web
+Fuentes: Reddit API + Foros + TodoExpertos + Nitter (Twitter público)
 """
 import asyncio
 import httpx
@@ -9,21 +9,20 @@ import random
 from datetime import datetime
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept-Language": "es-AR,es;q=0.9",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
 DELAY_MIN = 1.5
 DELAY_MAX = 3.5
-
-# ─── KEYWORDS POR SERVICIO ────────────────────────────────────────────────────
 
 KEYWORDS = {
     "contador": [
         "necesito contador", "busco contador", "problema monotributo",
         "ayuda AFIP", "multa AFIP", "carta AFIP", "me llegó AFIP",
         "no entiendo monotributo", "cómo facturo", "inscribirme AFIP",
-        "cambio categoría monotributo", "deuda AFIP",
+        "cambio categoría monotributo", "deuda AFIP", "necesito contadora",
     ],
     "abogado": [
         "necesito abogado", "busco abogado", "consulta legal",
@@ -36,160 +35,179 @@ KEYWORDS = {
     ],
 }
 
-# ─── REDDIT API PÚBLICA ───────────────────────────────────────────────────────
-
-REDDIT_SUBREDDITS = [
-    "argentina", "DerechoArg", "ContadoresArg",
-    "trabajo_ar", "merval", "buenosaires"
-]
+SUBREDDITS = ["argentina", "DerechoArg", "trabajo_ar", "buenosaires", "merval"]
 
 async def scrape_reddit(keywords: list, client: httpx.AsyncClient) -> list:
     resultados = []
-    for kw in keywords[:3]:  # máximo 3 keywords para no sobrecargar
-        for sub in REDDIT_SUBREDDITS[:3]:
+    for kw in keywords[:4]:
+        for sub in SUBREDDITS[:3]:
             try:
                 await asyncio.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
                 url = f"https://www.reddit.com/r/{sub}/search.json?q={kw}&sort=new&limit=10&restrict_sr=1"
-                resp = await client.get(url, headers={
-                    **HEADERS,
-                    "User-Agent": "IntentoBot:1.0 (lead detection)"
-                })
+                resp = await client.get(url, headers={**HEADERS, "User-Agent": "IntentoBot:1.0"})
                 if resp.status_code != 200:
                     continue
-                data = resp.json()
-                posts = data.get("data", {}).get("children", [])
+                posts = resp.json().get("data", {}).get("children", [])
                 for post in posts:
                     p = post.get("data", {})
                     titulo = p.get("title", "")
-                    cuerpo = p.get("selftext", "")[:300]
-                    texto = f"{titulo} {cuerpo}".strip()
+                    cuerpo = p.get("selftext", "")[:400]
+                    texto = f"{titulo}. {cuerpo}".strip(". ")
                     if len(texto) < 15:
                         continue
                     resultados.append({
                         "texto": texto,
                         "link": f"https://reddit.com{p.get('permalink', '')}",
                         "fuente": f"Reddit/r/{sub}",
+                        "autor": p.get("author", ""),
+                        "fecha_original": datetime.fromtimestamp(p.get("created_utc", 0)).isoformat() if p.get("created_utc") else "",
                     })
             except Exception as e:
-                print(f"[Reddit] Error: {e}")
+                print(f"[Reddit] Error {kw}/{sub}: {e}")
     return resultados
 
-# ─── FOROCONTABLE ─────────────────────────────────────────────────────────────
+NITTER_INSTANCES = ["https://nitter.net", "https://nitter.privacydev.net"]
+
+async def scrape_twitter_publico(keywords: list, client: httpx.AsyncClient) -> list:
+    resultados = []
+    for kw in keywords[:3]:
+        for instance in NITTER_INSTANCES[:1]:
+            try:
+                await asyncio.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
+                url = f"{instance}/search?q={kw.replace(' ', '+')}&f=tweets"
+                resp = await client.get(url, headers=HEADERS, timeout=10.0)
+                if resp.status_code != 200:
+                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+                tweets = soup.select(".tweet-content")[:10]
+                usernames = soup.select(".username")
+                for i, tweet in enumerate(tweets):
+                    texto = tweet.get_text(strip=True)
+                    if len(texto) < 20:
+                        continue
+                    username = usernames[i].get_text(strip=True) if i < len(usernames) else ""
+                    link = f"https://twitter.com/{username.strip('@')}" if username else instance
+                    resultados.append({
+                        "texto": texto,
+                        "link": link,
+                        "fuente": "Twitter/X",
+                        "autor": username,
+                        "fecha_original": "",
+                    })
+            except Exception as e:
+                print(f"[Twitter] Error: {e}")
+    return resultados
 
 async def scrape_forocontable(client: httpx.AsyncClient) -> list:
     resultados = []
     try:
         await asyncio.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
-        url = "https://www.forocontable.com.ar/viewforum.php?f=2"
-        resp = await client.get(url, headers=HEADERS, timeout=10.0)
+        resp = await client.get("https://www.forocontable.com.ar/viewforum.php?f=2", headers=HEADERS, timeout=10.0)
         if resp.status_code != 200:
             return []
         soup = BeautifulSoup(resp.text, "html.parser")
         for topic in soup.select(".topictitle")[:15]:
             titulo = topic.get_text(strip=True)
-            link = topic.get("href", "")
-            if any(kw in titulo.lower() for kw in ["necesito", "ayuda", "problema", "consulta", "urgente", "afip", "monotributo"]):
+            href = topic.get("href", "")
+            kws = ["necesito", "ayuda", "problema", "consulta", "urgente", "afip", "monotributo", "busco"]
+            if any(k in titulo.lower() for k in kws):
                 resultados.append({
                     "texto": titulo,
-                    "link": f"https://www.forocontable.com.ar/{link}",
+                    "link": f"https://www.forocontable.com.ar/{href}",
                     "fuente": "ForoContable",
+                    "autor": "",
+                    "fecha_original": "",
                 })
     except Exception as e:
         print(f"[ForoContable] Error: {e}")
     return resultados
 
-# ─── MERCADOLIBRE FOROS (PÚBLICO) ─────────────────────────────────────────────
-
-async def scrape_ml_foros(keywords: list, client: httpx.AsyncClient) -> list:
-    """MercadoLibre tiene foros públicos con preguntas de usuarios."""
+async def scrape_todoexpertos(keywords: list, client: httpx.AsyncClient) -> list:
     resultados = []
     for kw in keywords[:2]:
         try:
             await asyncio.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
-            url = f"https://vendedores.mercadolibre.com.ar/nota/buscar?q={kw.replace(' ', '+')}"
-            resp = await client.get(url, headers=HEADERS, timeout=10.0)
-            if resp.status_code != 200:
-                continue
-            soup = BeautifulSoup(resp.text, "html.parser")
-            for item in soup.select("h2, h3, .post-title")[:10]:
-                texto = item.get_text(strip=True)
-                if len(texto) > 20:
-                    resultados.append({
-                        "texto": texto,
-                        "link": url,
-                        "fuente": "MercadoLibre Foros",
-                    })
-        except Exception as e:
-            print(f"[ML Foros] Error: {e}")
-    return resultados
-
-# ─── YAHOO RESPUESTAS ALTERNATIVAS / PREGUNTAS PÚBLICAS ──────────────────────
-
-async def scrape_quora_publico(keywords: list, client: httpx.AsyncClient) -> list:
-    """Busca en sitios de preguntas y respuestas públicos."""
-    resultados = []
-    for kw in keywords[:2]:
-        try:
-            await asyncio.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
-            # Todoexpertos.com - foro público en español
             url = f"https://www.todoexpertos.com/buscar?q={kw.replace(' ', '+')}"
             resp = await client.get(url, headers=HEADERS, timeout=10.0)
             if resp.status_code != 200:
                 continue
             soup = BeautifulSoup(resp.text, "html.parser")
-            for item in soup.select(".question-title, .title, h2 a")[:8]:
+            for item in soup.select(".question-title, h2 a, .title a")[:8]:
                 texto = item.get_text(strip=True)
-                link = item.get("href", url)
+                href = item.get("href", "")
                 if len(texto) > 20:
                     resultados.append({
                         "texto": texto,
-                        "link": link if link.startswith("http") else f"https://www.todoexpertos.com{link}",
+                        "link": href if href.startswith("http") else f"https://www.todoexpertos.com{href}",
                         "fuente": "TodoExpertos",
+                        "autor": "",
+                        "fecha_original": "",
                     })
         except Exception as e:
             print(f"[TodoExpertos] Error: {e}")
     return resultados
 
-# ─── ORQUESTADOR PRINCIPAL ────────────────────────────────────────────────────
+def calcular_score(texto: str) -> int:
+    texto_lower = texto.lower()
+    score = 0
+    alta = ["urgente", "ya mismo", "hoy", "lo antes posible", "necesito ya",
+            "cuanto antes", "para mañana", "me llegó carta", "me intimaron",
+            "embargo", "multa", "ejecución"]
+    score += min(sum(15 for k in alta if k in texto_lower), 60)
+    media = ["necesito", "busco", "me recomiendan", "cuánto cobra", "precio",
+             "honorarios", "contratar", "alguien que"]
+    score += min(sum(10 for k in media if k in texto_lower), 45)
+    problema = ["problema", "error", "no entiendo", "no sé", "ayuda",
+                "afip", "monotributo", "factura", "deuda"]
+    score += min(sum(5 for k in problema if k in texto_lower), 30)
+    return min(score, 100)
 
-async def scrape_todas_fuentes(keywords_texto: str, servicio: str = "contador", max_results: int = 30) -> list:
-    """
-    Busca en todas las fuentes públicas disponibles.
-    keywords_texto: texto libre como "necesito contador urgente"
-    """
-    # Combinar keywords del servicio con el texto ingresado
+def enrich_contact(resultado: dict) -> dict:
+    link = resultado.get("link", "")
+    autor = resultado.get("autor", "")
+    contacto = {}
+    if "reddit.com" in link and autor:
+        contacto["reddit_user"] = autor
+        contacto["reddit_perfil"] = f"https://reddit.com/u/{autor}"
+        contacto["como_contactar"] = f"https://reddit.com/message/compose/?to={autor}"
+    elif "twitter.com" in link and autor:
+        contacto["twitter_user"] = autor
+        contacto["como_contactar"] = link
+    elif link:
+        contacto["como_contactar"] = link
+    return {**resultado, "contacto": contacto}
+
+async def scrape_todas_fuentes(keywords_texto: str, servicio: str = "contador", max_results: int = 40) -> list:
     kws_servicio = KEYWORDS.get(servicio, KEYWORDS["contador"])
     kws_custom = [keywords_texto] if keywords_texto else []
     todas_kws = list(set(kws_custom + kws_servicio[:5]))
 
-    resultados = []
-
-    async with httpx.AsyncClient(
-        timeout=15.0,
-        follow_redirects=True,
-        headers=HEADERS
-    ) as client:
-        # Ejecutar todas las fuentes en paralelo
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         tareas = await asyncio.gather(
             scrape_reddit(todas_kws, client),
+            scrape_twitter_publico(todas_kws, client),
             scrape_forocontable(client),
-            scrape_ml_foros(todas_kws, client),
-            scrape_quora_publico(todas_kws, client),
+            scrape_todoexpertos(todas_kws, client),
             return_exceptions=True
         )
 
-        for resultado in tareas:
-            if isinstance(resultado, list):
-                resultados.extend(resultado)
+    resultados = []
+    for t in tareas:
+        if isinstance(t, list):
+            resultados.extend(t)
 
-    # Deduplicar por texto similar
-    seen_texts = set()
+    for r in resultados:
+        r["score"] = calcular_score(r.get("texto", ""))
+        r = enrich_contact(r)
+
+    seen = set()
     unique = []
     for r in resultados:
-        key = r["texto"][:50].lower()
-        if key not in seen_texts:
-            seen_texts.add(key)
+        key = r["texto"][:60].lower()
+        if key not in seen:
+            seen.add(key)
             unique.append(r)
 
-    print(f"[SCRAPER] {len(unique)} resultados únicos de {len(resultados)} totales")
+    unique.sort(key=lambda x: x.get("score", 0), reverse=True)
+    print(f"[SCRAPER] {len(unique)} resultados únicos")
     return unique[:max_results]
