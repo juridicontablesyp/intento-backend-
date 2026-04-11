@@ -1,22 +1,16 @@
-from fastapi import FastAPI, BackgroundTasks, Query
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import asyncio
 from datetime import datetime
-from typing import Optional
-from database import init_db, get_leads, save_lead, get_stats
+from database import init_db, get_leads, save_lead, get_stats, marcar_contactado
 from classifier import classify_intent
 from message_generator import generate_message
 from scraper import scrape_todas_fuentes
 
-app = FastAPI(title="Intento API", version="1.0.0")
+app = FastAPI(title="Intento API", version="2.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("startup")
 async def startup():
@@ -45,7 +39,11 @@ def run_scan(keywords: str):
             "nivel_intencion": nivel,
             "fuente": r["fuente"],
             "link": r["link"],
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now().isoformat(),
+            "score": r.get("score", 0),
+            "autor": r.get("autor", ""),
+            "fecha_original": r.get("fecha_original", ""),
+            "contacto": r.get("contacto", {}),
         }
         save_lead(lead)
         saved += 1
@@ -54,7 +52,15 @@ def run_scan(keywords: str):
 @app.post("/api/leads/manual")
 def add_manual_lead(texto: str, fuente: str = "manual", link: str = ""):
     nivel = classify_intent(texto)
-    lead = {"texto_detectado": texto, "nivel_intencion": nivel, "fuente": fuente, "link": link, "fecha": datetime.now().isoformat()}
+    from scraper import calcular_score
+    lead = {
+        "texto_detectado": texto,
+        "nivel_intencion": nivel,
+        "fuente": fuente,
+        "link": link,
+        "fecha": datetime.now().isoformat(),
+        "score": calcular_score(texto),
+    }
     lead_id = save_lead(lead)
     return {"id": lead_id, **lead}
 
@@ -67,9 +73,14 @@ def get_message(lead_id: int):
     msg = generate_message(lead["texto_detectado"], lead.get("nivel_intencion", "media"))
     return {"mensaje": msg}
 
+@app.post("/api/leads/{lead_id}/contactado")
+def marcar(lead_id: int):
+    marcar_contactado(lead_id)
+    return {"ok": True}
+
 @app.get("/")
 def root():
-    return {"status": "Intento API corriendo"}
+    return {"status": "Intento API v2.0 corriendo"}
 
 if __name__ == "__main__":
     init_db()
