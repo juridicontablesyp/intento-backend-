@@ -25,12 +25,12 @@ def stats():
     return get_stats()
 
 @app.post("/api/scan")
-def scan(background_tasks: BackgroundTasks, keywords: str = "necesito contador"):
-    background_tasks.add_task(run_scan, keywords)
+def scan(background_tasks: BackgroundTasks, keywords: str = "necesito contador", servicio: str = "contador"):
+    background_tasks.add_task(run_scan, keywords, servicio)
     return {"status": "scanning", "keywords": keywords}
 
-def run_scan(keywords: str):
-    resultados = asyncio.run(scrape_todas_fuentes(keywords, "contador"))
+def run_scan(keywords: str, servicio: str = "contador"):
+    resultados = asyncio.run(scrape_todas_fuentes(keywords, servicio))
     saved = 0
     for r in resultados:
         nivel = classify_intent(r["texto"])
